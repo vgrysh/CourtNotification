@@ -5,7 +5,9 @@
       "Bash(pkill -f CourtNotification)",
       "Bash(mvn package *)",
       "Bash(java -jar target/CourtNotification-1.0-SNAPSHOT.jar)",
-      "Bash(curl -s \"http://localhost:8080/api/clubs\")"
+      "Bash(curl -s \"http://localhost:8080/api/clubs\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(pkill -f CourtNotification 2>/dev/null; sleep 1 *)"
     ]
   }
 }

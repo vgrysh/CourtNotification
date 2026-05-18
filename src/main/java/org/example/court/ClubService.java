@@ -1,13 +1,14 @@
 package org.example.court;
 
+import jakarta.annotation.PostConstruct;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +18,29 @@ public class ClubService {
 
     private static final String CLUBS_URL = "https://kluby.org/tenis/kluby/warszawa";
 
-    public List<Club> fetchClubs() throws IOException {
+    private List<Club> cache = Collections.emptyList();
+
+    private final LogService logService;
+
+    public ClubService(LogService logService) {
+        this.logService = logService;
+    }
+
+    @PostConstruct
+    public void init() {
+        try {
+            cache = load();
+            logService.log("Fetched " + cache.size() + " clubs on startup");
+        } catch (Exception e) {
+            logService.log("ERROR fetching clubs on startup: " + e.getMessage());
+        }
+    }
+
+    public List<Club> fetchClubs() {
+        return cache;
+    }
+
+    private List<Club> load() throws Exception {
         Document doc = Jsoup.connect(CLUBS_URL)
                 .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
                 .timeout(15_000)

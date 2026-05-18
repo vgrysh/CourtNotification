@@ -30,7 +30,16 @@
       border-radius: 14px;
       padding: 24px;
       max-width: 680px;
-      margin: 0 auto 24px;
+      margin: 0 auto 20px;
+    }
+
+    .card-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #7c85a2;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
     }
 
     .grid {
@@ -68,8 +77,6 @@
     /* Club combobox */
     .combo-wrap { position: relative; }
 
-    #clubInput::placeholder { color: #4a5068; }
-
     .combo-dropdown {
       display: none;
       position: absolute;
@@ -92,11 +99,9 @@
     }
 
     .combo-item:hover, .combo-item.active { background: #2d3148; }
-
     .combo-item-name { font-size: 0.9rem; color: #e2e8f0; }
     .combo-item-loc  { font-size: 0.75rem; color: #7c85a2; margin-top: 1px; }
-
-    .combo-loading { padding: 12px; color: #7c85a2; font-size: 0.85rem; text-align: center; }
+    .combo-loading   { padding: 12px; color: #7c85a2; font-size: 0.85rem; text-align: center; }
 
     .row-actions {
       display: flex;
@@ -135,7 +140,7 @@
     #status.error { color: #f87171; }
     #status.ok    { color: #4ade80; }
 
-    #results { max-width: 680px; margin: 0 auto; }
+    #results { max-width: 680px; margin: 0 auto 20px; }
 
     .slot-card {
       background: #1a1d27;
@@ -200,14 +205,92 @@
       letter-spacing: 0.06em;
       margin-bottom: 12px;
     }
+
+    /* Telegram */
+    .tg-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .tg-row input { flex: 1; }
+
+    .btn-tg {
+      padding: 10px 16px;
+      background: #229ED9;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+      flex: none;
+    }
+
+    .btn-tg:hover { background: #1a8bbf; }
+    .btn-tg:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .tg-status {
+      font-size: 0.8rem;
+      margin-top: 6px;
+      min-height: 16px;
+    }
+
+    .tg-status.linked   { color: #4ade80; }
+    .tg-status.unlinked { color: #f87171; }
+    .tg-status.info     { color: #7c85a2; }
+
+    .hint {
+      font-size: 0.78rem;
+      color: #4a5068;
+      margin-top: 6px;
+    }
+
+    .hint a { color: #229ED9; text-decoration: none; }
+
+    /* Logs */
+    #logBox {
+      background: #0a0c14;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.78rem;
+      color: #7c85a2;
+      padding: 12px;
+      height: 200px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    #logBox .log-line { white-space: pre-wrap; }
+    #logBox .log-line.found { color: #4ade80; }
+    #logBox .log-line.error { color: #f87171; }
+    #logBox .log-line.tg    { color: #229ED9; }
+
+    .log-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .btn-clear {
+      background: none;
+      border: 1px solid #2d3148;
+      color: #7c85a2;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      flex: none;
+    }
+
+    .btn-clear:hover { border-color: #4f6ef7; color: #e2e8f0; }
   </style>
 </head>
 <body>
   <h1>🎾 Court Availability</h1>
 
+  <!-- Search -->
   <div class="card">
     <div class="grid">
-
       <div class="full">
         <label>Club</label>
         <div class="combo-wrap">
@@ -217,7 +300,6 @@
           </div>
         </div>
       </div>
-
       <div>
         <label>Date</label>
         <input id="date" type="date" />
@@ -232,24 +314,15 @@
           <option value="30">Every 30 min</option>
         </select>
       </div>
-
       <div>
         <label>Court filter (optional)</label>
         <input id="court" placeholder="e.g. Kort 4" />
       </div>
       <div style="display:flex;gap:8px;">
-        <div style="flex:1">
-          <label>From</label>
-          <input id="from" type="time" />
-        </div>
-        <div style="flex:1">
-          <label>To</label>
-          <input id="to" type="time" />
-        </div>
+        <div style="flex:1"><label>From</label><input id="from" type="time" step="3600" /></div>
+        <div style="flex:1"><label>To</label><input id="to" type="time" step="3600" /></div>
       </div>
-
     </div>
-
     <div class="row-actions">
       <button id="btnCheck" onclick="checkOnce()">Check now</button>
       <button id="btnPoll" onclick="togglePoll()">Start polling</button>
@@ -257,10 +330,50 @@
     <div id="status"></div>
   </div>
 
+  <!-- Results -->
   <div id="results"></div>
+
+  <!-- Telegram -->
+  <div class="card">
+    <div class="card-title">Telegram notifications</div>
+    <div>
+      <label>Bot token</label>
+      <div class="tg-row">
+        <input id="tgToken" type="password" placeholder="1234567890:AAH…" autocomplete="off" />
+        <button class="btn-tg" onclick="saveToken()">Save</button>
+      </div>
+      <div class="hint">
+        Get a token from <a href="https://t.me/BotFather" target="_blank">@BotFather</a>. Stored in memory only — re-enter after restart.
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <label>Your username</label>
+      <div class="tg-row">
+        <input id="tgUsername" placeholder="@yourusername" autocomplete="off" />
+        <button class="btn-tg" id="btnLink" onclick="linkTelegram()">Link</button>
+      </div>
+      <div class="hint">Send <b>/start</b> to your bot first, then click Link.</div>
+      <div id="tgStatus" class="tg-status info"></div>
+    </div>
+  </div>
+
+  <!-- Logs -->
+  <div class="card">
+    <div class="log-toolbar">
+      <div class="card-title" style="margin-bottom:0">Activity log</div>
+      <button class="btn-clear" onclick="clearLogs()">Clear</button>
+    </div>
+    <div id="logBox"><span style="color:#4a5068">Waiting for activity…</span></div>
+  </div>
 
   <script>
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+    ['from', 'to'].forEach(id => {
+      document.getElementById(id).addEventListener('input', function () {
+        if (this.value) this.value = this.value.slice(0, 3) + '00';
+      });
+    });
 
     // ── Club combobox ────────────────────────────────────────────────
     let allClubs = [];
@@ -298,17 +411,14 @@
       clubDropdown.classList.remove('open');
     }
 
-    clubInput.addEventListener('focus', () => {
-      clubDropdown.classList.add('open');
-    });
+    clubInput.addEventListener('focus', () => clubDropdown.classList.add('open'));
 
     clubInput.addEventListener('input', () => {
       selectedSlug = '';
       const q = clubInput.value.toLowerCase();
-      const filtered = allClubs.filter(c =>
+      renderDropdown(allClubs.filter(c =>
         c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q)
-      );
-      renderDropdown(filtered);
+      ));
       clubDropdown.classList.add('open');
     });
 
@@ -318,12 +428,51 @@
 
     loadClubs();
 
+    // ── Telegram ─────────────────────────────────────────────────────
+    let tgLinked = false;
+
+    async function saveToken() {
+      const token = document.getElementById('tgToken').value.trim();
+      if (!token) return;
+      await fetch('/api/telegram/configure?token=' + encodeURIComponent(token), { method: 'POST' });
+      document.getElementById('tgToken').value = '●'.repeat(10);
+      setTgStatus('Token saved.', 'info');
+    }
+
+    function setTgStatus(msg, type = 'info') {
+      const el = document.getElementById('tgStatus');
+      el.textContent = msg;
+      el.className = 'tg-status ' + type;
+    }
+
+    async function linkTelegram() {
+      const username = document.getElementById('tgUsername').value.trim();
+      if (!username) { setTgStatus('Enter your username first.', 'unlinked'); return; }
+      const btn = document.getElementById('btnLink');
+      btn.disabled = true;
+      btn.textContent = 'Linking…';
+      setTgStatus('Searching for your message…', 'info');
+      try {
+        const res = await fetch('/api/telegram/link?username=' + encodeURIComponent(username), { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) {
+          setTgStatus(data.error || 'Link failed.', 'unlinked');
+        } else {
+          tgLinked = true;
+          setTgStatus('✓ Linked — notifications will be sent to ' + username, 'linked');
+        }
+      } catch (e) {
+        setTgStatus('Error: ' + e.message, 'unlinked');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Link';
+      }
+    }
+
     // ── Polling ──────────────────────────────────────────────────────
     let pollTimer = null;
 
-    function currentSlug() {
-      return selectedSlug || clubInput.value.trim();
-    }
+    function currentSlug() { return selectedSlug || clubInput.value.trim(); }
 
     function params() {
       const p = new URLSearchParams({
@@ -333,9 +482,11 @@
       const court = document.getElementById('court').value.trim();
       const from  = document.getElementById('from').value;
       const to    = document.getElementById('to').value;
-      if (court) p.set('court', court);
-      if (from)  p.set('from', from);
-      if (to)    p.set('to', to);
+      const tgUser = document.getElementById('tgUsername').value.trim();
+      if (court)  p.set('court', court);
+      if (from)   p.set('from', from);
+      if (to)     p.set('to', to);
+      if (tgUser && tgLinked) p.set('telegramUser', tgUser);
       return p;
     }
 
@@ -376,7 +527,9 @@
         return;
       }
       el.innerHTML = `
-        <div class="section-title">Available slots <span class="badge">${slots.length}</span></div>
+        <div class="section-title" style="max-width:680px;margin:0 auto 12px">
+          Available slots <span class="badge">${slots.length}</span>
+        </div>
         ${slots.map(s => `
           <div class="slot-card">
             <div class="slot-info">
@@ -408,6 +561,46 @@
         btn.classList.add('active');
       }
     }
+
+    // ── Logs ─────────────────────────────────────────────────────────
+    let lastLogCount = 0;
+    let localLogs = [];
+
+    function clearLogs() {
+      localLogs = [];
+      lastLogCount = 0;
+      document.getElementById('logBox').innerHTML = '<span style="color:#4a5068">Log cleared.</span>';
+    }
+
+    function classForLine(line) {
+      if (line.includes('ERROR')) return 'error';
+      if (line.includes('slot(s) found') || line.includes('slot(s) available')) return 'found';
+      if (line.includes('Telegram →') || line.includes('Linked') || line.includes('Token')) return 'tg';
+      return '';
+    }
+
+    async function pollLogs() {
+      try {
+        const res = await fetch('/api/logs');
+        const lines = await res.json();
+        if (lines.length !== lastLogCount) {
+          lastLogCount = lines.length;
+          localLogs = lines;
+          const box = document.getElementById('logBox');
+          box.innerHTML = lines.map(l =>
+            `<div class="log-line ${classForLine(l)}">${escHtml(l)}</div>`
+          ).join('');
+          box.scrollTop = box.scrollHeight;
+        }
+      } catch (_) {}
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    setInterval(pollLogs, 2000);
+    pollLogs();
   </script>
 </body>
 </html>
