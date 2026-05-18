@@ -318,7 +318,16 @@
         <label>Court filter (optional)</label>
         <input id="court" placeholder="e.g. Kort 4" />
       </div>
-      <div style="display:flex;gap:8px;">
+      <div>
+        <label>Duration</label>
+        <select id="duration">
+          <option value="">Any</option>
+          <option value="60">1h</option>
+          <option value="90">1.5h</option>
+          <option value="120">2h</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;grid-column:1/-1;">
         <div style="flex:1"><label>From</label><input id="from" type="time" step="3600" /></div>
         <div style="flex:1"><label>To</label><input id="to" type="time" step="3600" /></div>
       </div>
@@ -368,6 +377,8 @@
 
   <script>
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('from').value = '08:00';
+    document.getElementById('to').value = '12:00';
 
     ['from', 'to'].forEach(id => {
       document.getElementById(id).addEventListener('input', function () {
@@ -482,10 +493,12 @@
       const court = document.getElementById('court').value.trim();
       const from  = document.getElementById('from').value;
       const to    = document.getElementById('to').value;
-      const tgUser = document.getElementById('tgUsername').value.trim();
-      if (court)  p.set('court', court);
-      if (from)   p.set('from', from);
-      if (to)     p.set('to', to);
+      const tgUser   = document.getElementById('tgUsername').value.trim();
+      const duration = document.getElementById('duration').value;
+      if (court)    p.set('court', court);
+      if (from)     p.set('from', from);
+      if (to)       p.set('to', to);
+      if (duration) p.set('duration', duration);
       if (tgUser && tgLinked) p.set('telegramUser', tgUser);
       return p;
     }

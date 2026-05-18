@@ -7,7 +7,9 @@
       "Bash(java -jar target/CourtNotification-1.0-SNAPSHOT.jar)",
       "Bash(curl -s \"http://localhost:8080/api/clubs\")",
       "mcp__Claude_Preview__preview_start",
-      "Bash(pkill -f CourtNotification 2>/dev/null; sleep 1 *)"
+      "Bash(pkill -f CourtNotification 2>/dev/null; sleep 1 *)",
+      "Bash(curl -s \"http://localhost:8080/api/check?club=timing&date=2026-05-18&duration=60\")",
+      "Bash(curl -s \"http://localhost:8080/api/check?club=timing&date=2026-05-19&duration=60\")"
     ]
   }
 }

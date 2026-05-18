@@ -9,8 +9,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class CourtService {
@@ -20,7 +19,7 @@ public class CourtService {
 
     public List<AvailableSlot> checkAvailability(
             String clubSlug, String date, String courtFilter,
-            String fromTimeStr, String toTimeStr) throws IOException {
+            String fromTimeStr, String toTimeStr, Integer durationMinutes) throws IOException {
 
         LocalTime fromTime = fromTimeStr != null && !fromTimeStr.isBlank() ? LocalTime.parse(fromTimeStr, TIME_FMT) : null;
         LocalTime toTime = toTimeStr != null && !toTimeStr.isBlank() ? LocalTime.parse(toTimeStr, TIME_FMT) : null;
@@ -39,7 +38,8 @@ public class CourtService {
             if (!name.isEmpty()) courtNames.add(name);
         }
 
-        List<AvailableSlot> result = new ArrayList<>();
+        // Collect all raw 30-min available slots
+        List<AvailableSlot> raw = new ArrayList<>();
 
         Elements rows = doc.select("table tr");
         for (Element row : rows) {
@@ -68,7 +68,53 @@ public class CourtService {
 
                 Element link = cells.get(i).selectFirst("a[href*=rezerwuj]");
                 if (link != null) {
-                    result.add(new AvailableSlot(courtName, startTimeStr, "https://kluby.org" + link.attr("href")));
+                    raw.add(new AvailableSlot(courtName, startTimeStr, "https://kluby.org" + link.attr("href")));
+                }
+            }
+        }
+
+        if (durationMinutes == null || durationMinutes <= 0) return raw;
+
+        return filterByDuration(raw, durationMinutes);
+    }
+
+    /**
+     * From raw 30-min slots, find all consecutive blocks covering the requested duration.
+     * Returns one slot per valid block, with time shown as "HH:mm – HH:mm".
+     */
+    private List<AvailableSlot> filterByDuration(List<AvailableSlot> slots, int durationMinutes) {
+        int slotsNeeded = (int) Math.ceil(durationMinutes / 30.0);
+
+        // Group by court, preserving insertion order (time-sorted from the page)
+        Map<String, List<AvailableSlot>> byCourt = new LinkedHashMap<>();
+        for (AvailableSlot s : slots) {
+            byCourt.computeIfAbsent(s.court(), k -> new ArrayList<>()).add(s);
+        }
+
+        List<AvailableSlot> result = new ArrayList<>();
+
+        for (List<AvailableSlot> courtSlots : byCourt.values()) {
+            courtSlots.sort(Comparator.comparing(AvailableSlot::time));
+
+            for (int i = 0; i <= courtSlots.size() - slotsNeeded; i++) {
+                boolean consecutive = true;
+                for (int j = 1; j < slotsNeeded; j++) {
+                    LocalTime t1 = LocalTime.parse(courtSlots.get(i + j - 1).time(), TIME_FMT);
+                    LocalTime t2 = LocalTime.parse(courtSlots.get(i + j).time(), TIME_FMT);
+                    if (!t2.equals(t1.plusMinutes(30))) {
+                        consecutive = false;
+                        break;
+                    }
+                }
+                if (consecutive) {
+                    String startTime = courtSlots.get(i).time();
+                    String endTime = LocalTime.parse(courtSlots.get(i + slotsNeeded - 1).time(), TIME_FMT)
+                            .plusMinutes(30).format(TIME_FMT);
+                    result.add(new AvailableSlot(
+                            courtSlots.get(i).court(),
+                            startTime + " – " + endTime,
+                            courtSlots.get(i).bookingUrl()
+                    ));
                 }
             }
         }
@@ -84,12 +130,11 @@ public class CourtService {
             String second = s.substring(half).trim();
             if (first.trim().equals(second)) return first.trim();
         }
-        // Also handle "A B A B" patterns by taking words up to the midpoint
         String[] words = s.split("\\s+");
         if (words.length % 2 == 0) {
             int half = words.length / 2;
-            String firstHalf = String.join(" ", java.util.Arrays.copyOf(words, half));
-            String secondHalf = String.join(" ", java.util.Arrays.copyOfRange(words, half, words.length));
+            String firstHalf = String.join(" ", Arrays.copyOf(words, half));
+            String secondHalf = String.join(" ", Arrays.copyOfRange(words, half, words.length));
             if (firstHalf.equals(secondHalf)) return firstHalf;
         }
         return s;

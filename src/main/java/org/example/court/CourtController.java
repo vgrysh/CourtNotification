@@ -39,14 +39,16 @@ public class CourtController {
             @RequestParam(required = false) String court,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer duration,
             @RequestParam(required = false) String telegramUser) {
         try {
-            List<AvailableSlot> slots = courtService.checkAvailability(club, date, court, from, to);
+            List<AvailableSlot> slots = courtService.checkAvailability(club, date, court, from, to, duration);
 
+            String durationLabel = duration != null ? " [" + duration + "min]" : "";
             if (slots.isEmpty()) {
-                logService.log("Check " + club + " on " + date + " → no slots");
+                logService.log("Check " + club + " on " + date + durationLabel + " → no slots");
             } else {
-                logService.log("Check " + club + " on " + date + " → " + slots.size() + " slot(s) found");
+                logService.log("Check " + club + " on " + date + durationLabel + " → " + slots.size() + " slot(s) found");
             }
 
             if (telegramUser != null && !telegramUser.isBlank()) {
