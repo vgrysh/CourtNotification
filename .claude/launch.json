@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "court-notification",
+      "runtimeExecutable": "java",
+      "runtimeArgs": ["-jar", "target/CourtNotification-1.0-SNAPSHOT.jar"],
+      "port": 8080
+    }
+  ]
+}

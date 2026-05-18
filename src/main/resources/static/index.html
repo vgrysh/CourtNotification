@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Court Availability</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 28px;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 14px;
+      padding: 24px;
+      max-width: 680px;
+      margin: 0 auto 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .full { grid-column: 1 / -1; }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #7c85a2;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    input, select {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus { border-color: #4f6ef7; }
+
+    /* Club combobox */
+    .combo-wrap { position: relative; }
+
+    #clubInput::placeholder { color: #4a5068; }
+
+    .combo-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .combo-dropdown.open { display: block; }
+
+    .combo-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .combo-item:hover, .combo-item.active { background: #2d3148; }
+
+    .combo-item-name { font-size: 0.9rem; color: #e2e8f0; }
+    .combo-item-loc  { font-size: 0.75rem; color: #7c85a2; margin-top: 1px; }
+
+    .combo-loading { padding: 12px; color: #7c85a2; font-size: 0.85rem; text-align: center; }
+
+    .row-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 11px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+    }
+
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    #btnCheck { background: #4f6ef7; color: #fff; }
+    #btnCheck:hover:not(:disabled) { background: #3a58e0; }
+
+    #btnPoll { background: #1e2d3d; color: #4fc3f7; border: 1px solid #4fc3f7; }
+    #btnPoll.active { background: #4fc3f7; color: #0f1117; }
+    #btnPoll:hover:not(:disabled):not(.active) { background: #263a4d; }
+
+    #status {
+      text-align: center;
+      font-size: 0.82rem;
+      color: #7c85a2;
+      margin-top: 14px;
+      min-height: 18px;
+    }
+
+    #status.error { color: #f87171; }
+    #status.ok    { color: #4ade80; }
+
+    #results { max-width: 680px; margin: 0 auto; }
+
+    .slot-card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-left: 3px solid #4f6ef7;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .slot-info { flex: 1; }
+    .slot-court { font-weight: 600; font-size: 0.95rem; color: #fff; }
+    .slot-time  { font-size: 0.82rem; color: #7c85a2; margin-top: 2px; }
+
+    .btn-book {
+      background: #4f6ef7;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex: none;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-book:hover { background: #3a58e0; }
+
+    .empty {
+      text-align: center;
+      color: #4a5068;
+      padding: 40px 20px;
+      font-size: 0.95rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #1e2d3d;
+      color: #4fc3f7;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #7c85a2;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎾 Court Availability</h1>
+
+  <div class="card">
+    <div class="grid">
+
+      <div class="full">
+        <label>Club</label>
+        <div class="combo-wrap">
+          <input id="clubInput" autocomplete="off" placeholder="Search club…" />
+          <div id="clubDropdown" class="combo-dropdown">
+            <div class="combo-loading">Loading clubs…</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label>Date</label>
+        <input id="date" type="date" />
+      </div>
+      <div>
+        <label>Poll interval</label>
+        <select id="interval">
+          <option value="1">Every 1 min</option>
+          <option value="2">Every 2 min</option>
+          <option value="5" selected>Every 5 min</option>
+          <option value="10">Every 10 min</option>
+          <option value="30">Every 30 min</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Court filter (optional)</label>
+        <input id="court" placeholder="e.g. Kort 4" />
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1">
+          <label>From</label>
+          <input id="from" type="time" />
+        </div>
+        <div style="flex:1">
+          <label>To</label>
+          <input id="to" type="time" />
+        </div>
+      </div>
+
+    </div>
+
+    <div class="row-actions">
+      <button id="btnCheck" onclick="checkOnce()">Check now</button>
+      <button id="btnPoll" onclick="togglePoll()">Start polling</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+    // ── Club combobox ────────────────────────────────────────────────
+    let allClubs = [];
+    let selectedSlug = '';
+
+    const clubInput    = document.getElementById('clubInput');
+    const clubDropdown = document.getElementById('clubDropdown');
+
+    async function loadClubs() {
+      try {
+        const res = await fetch('/api/clubs');
+        allClubs = await res.json();
+        renderDropdown(allClubs);
+      } catch (e) {
+        clubDropdown.innerHTML = `<div class="combo-loading">Failed to load clubs</div>`;
+      }
+    }
+
+    function renderDropdown(clubs) {
+      if (clubs.length === 0) {
+        clubDropdown.innerHTML = `<div class="combo-loading">No clubs found</div>`;
+        return;
+      }
+      clubDropdown.innerHTML = clubs.map(c => `
+        <div class="combo-item" data-slug="${c.slug}" onclick="selectClub('${c.slug}', '${c.name.replace(/'/g,"\\'")}')">
+          <div class="combo-item-name">${c.name}</div>
+          <div class="combo-item-loc">${c.location}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectClub(slug, name) {
+      selectedSlug = slug;
+      clubInput.value = name;
+      clubDropdown.classList.remove('open');
+    }
+
+    clubInput.addEventListener('focus', () => {
+      clubDropdown.classList.add('open');
+    });
+
+    clubInput.addEventListener('input', () => {
+      selectedSlug = '';
+      const q = clubInput.value.toLowerCase();
+      const filtered = allClubs.filter(c =>
+        c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q)
+      );
+      renderDropdown(filtered);
+      clubDropdown.classList.add('open');
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.combo-wrap')) clubDropdown.classList.remove('open');
+    });
+
+    loadClubs();
+
+    // ── Polling ──────────────────────────────────────────────────────
+    let pollTimer = null;
+
+    function currentSlug() {
+      return selectedSlug || clubInput.value.trim();
+    }
+
+    function params() {
+      const p = new URLSearchParams({
+        club: currentSlug(),
+        date: document.getElementById('date').value,
+      });
+      const court = document.getElementById('court').value.trim();
+      const from  = document.getElementById('from').value;
+      const to    = document.getElementById('to').value;
+      if (court) p.set('court', court);
+      if (from)  p.set('from', from);
+      if (to)    p.set('to', to);
+      return p;
+    }
+
+    function setStatus(msg, type = '') {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = type;
+    }
+
+    async function fetchSlots() {
+      if (!currentSlug()) { setStatus('Select a club first.', 'error'); return; }
+      setStatus('Checking…');
+      try {
+        const res = await fetch('/api/check?' + params());
+        if (!res.ok) throw new Error(await res.text());
+        const slots = await res.json();
+        renderSlots(slots);
+        const ts = new Date().toLocaleTimeString();
+        if (slots.length > 0) {
+          setStatus(`Last check: ${ts} — ${slots.length} slot(s) found`, 'ok');
+          if (Notification.permission === 'granted') {
+            new Notification('Court available!', {
+              body: `${slots.length} slot(s) open on ${document.getElementById('date').value}`,
+            });
+          }
+        } else {
+          setStatus(`Last check: ${ts} — no slots available`);
+        }
+      } catch (e) {
+        setStatus('Error: ' + e.message, 'error');
+      }
+    }
+
+    function renderSlots(slots) {
+      const el = document.getElementById('results');
+      if (slots.length === 0) {
+        el.innerHTML = '<div class="empty">No available slots found for this date.</div>';
+        return;
+      }
+      el.innerHTML = `
+        <div class="section-title">Available slots <span class="badge">${slots.length}</span></div>
+        ${slots.map(s => `
+          <div class="slot-card">
+            <div class="slot-info">
+              <div class="slot-court">${s.court}</div>
+              <div class="slot-time">${s.time}</div>
+            </div>
+            <a class="btn-book" href="${s.bookingUrl}" target="_blank">Book →</a>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    function checkOnce() { fetchSlots(); }
+
+    function togglePoll() {
+      const btn = document.getElementById('btnPoll');
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        btn.textContent = 'Start polling';
+        btn.classList.remove('active');
+        setStatus('Polling stopped.');
+      } else {
+        Notification.requestPermission();
+        const minutes = parseInt(document.getElementById('interval').value);
+        fetchSlots();
+        pollTimer = setInterval(fetchSlots, minutes * 60 * 1000);
+        btn.textContent = 'Stop polling';
+        btn.classList.add('active');
+      }
+    }
+  </script>
+</body>
+</html>
