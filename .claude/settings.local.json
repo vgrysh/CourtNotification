@@ -15,7 +15,11 @@
       "Bash(curl -s \"http://localhost:8080/api/check?club=timing&date=2026-05-22\")",
       "Bash(curl -s \"http://localhost:8080/api/check?club=timing&date=2026-05-19&from=08:00&to=10:00\")",
       "Bash(curl -s \"http://localhost:8080/api/logs\")",
-      "Bash(curl -s \"http://localhost:8080/api/check?club=timing&date=2026-05-20&from=11:00&to=16:00\")"
+      "Bash(curl -s \"http://localhost:8080/api/check?club=timing&date=2026-05-20&from=11:00&to=16:00\")",
+      "Bash(mvn -q package -DskipTests)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl -s http://localhost:8080/api/logs)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

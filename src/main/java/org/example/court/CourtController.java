@@ -51,7 +51,7 @@ public class CourtController {
                 logService.log("Check " + club + " on " + date + durationLabel + " → " + slots.size() + " slot(s) found");
             }
 
-            if (telegramUser != null && !telegramUser.isBlank()) {
+            if (telegramUser != null && !telegramUser.isBlank() && !slots.isEmpty()) {
                 String key = normalize(telegramUser);
                 Long chatId = linkedUsers.get(key);
                 if (chatId != null) {
