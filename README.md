@@ -8,9 +8,10 @@ A Spring Boot web app that monitors tennis court availability on [kluby.org](htt
 - **Availability check** — scrapes the booking schedule for a selected club and date
 - **Filtering** — filter by time range (from/to), specific court name, and minimum duration (1h / 1.5h / 2h)
 - **Auto-polling** — check on a configurable interval (e.g. every 5 minutes)
-- **Telegram notifications** — receive alerts in Telegram when slots open up; silent when nothing is found
+- **Telegram notifications** — receive alerts in Telegram only when slots are found; silent when nothing is available
 - **Browser notifications** — desktop alert when free slots are detected
 - **Live activity log** — real-time server-side log panel in the UI
+- **Stop server button** — shut down the server from the browser UI without touching the terminal
 
 ## Tech Stack
 
@@ -25,7 +26,16 @@ A Spring Boot web app that monitors tennis court availability on [kluby.org](htt
 - Java 17+
 - Maven 3.8+
 
-### Build & Run
+### macOS Launcher (recommended)
+
+Double-click **`CourtNotification.app`** in the project folder.
+
+- If the server is **not running** — builds the JAR if needed, starts the server, and opens the browser automatically
+- If the server is **running** — lets you open the browser or stop the app
+
+You can drag the app to your Dock or Applications folder for quick access.
+
+### Manual Build & Run
 
 ```bash
 mvn package -DskipTests
@@ -33,6 +43,8 @@ java -jar target/CourtNotification-1.0-SNAPSHOT.jar
 ```
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
+
+To stop the server, click **⏹ Stop server** in the top-right corner of the UI, or press `Ctrl+C` in the terminal.
 
 ### Telegram Setup
 
