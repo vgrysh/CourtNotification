@@ -284,10 +284,41 @@
     }
 
     .btn-clear:hover { border-color: #4f6ef7; color: #e2e8f0; }
+
+    .header-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      max-width: 680px;
+      margin: 0 auto 28px;
+    }
+
+    .header-wrap h1 { margin-bottom: 0; }
+
+    .btn-stop-server {
+      position: absolute;
+      right: 0;
+      background: none;
+      border: 1px solid #4a3030;
+      color: #f87171;
+      border-radius: 7px;
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn-stop-server:hover { background: #3d1e1e; border-color: #f87171; }
   </style>
 </head>
 <body>
-  <h1>🎾 Court Availability</h1>
+  <div class="header-wrap">
+    <h1>🎾 Court Availability</h1>
+    <button class="btn-stop-server" onclick="stopServer()">⏹ Stop server</button>
+  </div>
 
   <!-- Search -->
   <div class="card">
@@ -615,6 +646,20 @@
 
     setInterval(pollLogs, 2000);
     pollLogs();
+
+    // ── Stop server ───────────────────────────────────────────────────
+    async function stopServer() {
+      if (!confirm('Stop the server?')) return;
+      try {
+        await fetch('/api/shutdown', { method: 'POST' });
+      } catch (_) {}
+      document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;color:#7c85a2;font-family:-apple-system,sans-serif;">
+          <div style="font-size:3rem;margin-bottom:16px">⏹</div>
+          <div style="font-size:1.1rem;font-weight:600;color:#e2e8f0">Server stopped</div>
+          <div style="margin-top:8px;font-size:0.85rem">You can close this tab.</div>
+        </div>`;
+    }
   </script>
 </body>
 </html>

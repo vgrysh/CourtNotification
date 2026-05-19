@@ -19,7 +19,12 @@
       "Bash(mvn -q package -DskipTests)",
       "Bash(echo \"PID: $!\")",
       "Bash(curl -s http://localhost:8080/api/logs)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(iconutil -c icns /tmp/court_icon.iconset -o /tmp/court.icns)",
+      "Bash(sips -z 1024 1024 /tmp/court_icon.tiff --out /tmp/court_icon.iconset/icon_512x512@2x.png)",
+      "Bash(sips -g all /tmp/court_icon.iconset/icon_16x16.png)",
+      "Bash(/usr/libexec/PlistBuddy -c 'Set :CFBundleIconFile applet' /Users/volodymyrgryshaienko/Documents/proj/CourtNotification/CourtNotification.app/Contents/Info.plist)",
+      "Bash(python3 -c \"import sys,json; [print\\(l\\) for l in json.load\\(sys.stdin\\)[:3]]\")"
     ]
   }
 }

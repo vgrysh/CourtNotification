@@ -1,5 +1,6 @@
 package org.example.court;
 
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,15 +17,18 @@ public class CourtController {
     private final ClubService clubService;
     private final TelegramService telegramService;
     private final LogService logService;
+    private final ConfigurableApplicationContext appContext;
 
     private final ConcurrentHashMap<String, Long> linkedUsers = new ConcurrentHashMap<>();
 
     public CourtController(CourtService courtService, ClubService clubService,
-                           TelegramService telegramService, LogService logService) {
+                           TelegramService telegramService, LogService logService,
+                           ConfigurableApplicationContext appContext) {
         this.courtService = courtService;
         this.clubService = clubService;
         this.telegramService = telegramService;
         this.logService = logService;
+        this.appContext = appContext;
     }
 
     @GetMapping("/clubs")
@@ -108,6 +112,16 @@ public class CourtController {
     @GetMapping(value = "/logs", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> logs() {
         return ResponseEntity.ok(logService.recent());
+    }
+
+    @PostMapping("/shutdown")
+    public ResponseEntity<?> shutdown() {
+        logService.log("Shutdown requested from UI — stopping server…");
+        new Thread(() -> {
+            try { Thread.sleep(400); } catch (InterruptedException ignored) {}
+            appContext.close();
+        }).start();
+        return ResponseEntity.ok(Map.of("message", "Shutting down…"));
     }
 
     private String normalize(String username) {
