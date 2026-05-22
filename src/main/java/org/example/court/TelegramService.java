@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TelegramService {
@@ -19,7 +20,12 @@ public class TelegramService {
     @Value("${telegram.bot.token:}")
     private String configToken;
 
+    @Value("${telegram.chat.id:}")
+    private String configChatId;
+
     private volatile String runtimeToken;
+
+    private final ConcurrentHashMap<String, Long> linkedUsers = new ConcurrentHashMap<>();
 
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper mapper = new ObjectMapper();
@@ -40,6 +46,28 @@ public class TelegramService {
     public boolean isConfigured() {
         String t = token();
         return t != null && !t.isBlank();
+    }
+
+    /** Returns the chat ID from TELEGRAM_CHAT_ID env var, or null if not set. */
+    public Long getConfiguredChatId() {
+        if (configChatId == null || configChatId.isBlank()) return null;
+        try { return Long.parseLong(configChatId.trim()); } catch (NumberFormatException e) { return null; }
+    }
+
+    public void linkUser(String username, Long chatId) {
+        linkedUsers.put(normalize(username), chatId);
+    }
+
+    public Long getChatId(String username) {
+        return linkedUsers.get(normalize(username));
+    }
+
+    public boolean isLinked(String username) {
+        return linkedUsers.containsKey(normalize(username));
+    }
+
+    private String normalize(String u) {
+        return u.startsWith("@") ? u.substring(1).toLowerCase() : u.toLowerCase();
     }
 
     /** Scan recent bot updates to find the chat ID for the given username (without @). */

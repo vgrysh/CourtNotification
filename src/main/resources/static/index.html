@@ -513,18 +513,16 @@
     }
 
     // ── Polling ──────────────────────────────────────────────────────
-    let pollTimer = null;
-
     function currentSlug() { return selectedSlug || clubInput.value.trim(); }
 
-    function params() {
+    function checkParams() {
       const p = new URLSearchParams({
         club: currentSlug(),
         date: document.getElementById('date').value,
       });
-      const court = document.getElementById('court').value.trim();
-      const from  = document.getElementById('from').value;
-      const to    = document.getElementById('to').value;
+      const court    = document.getElementById('court').value.trim();
+      const from     = document.getElementById('from').value;
+      const to       = document.getElementById('to').value;
       const tgUser   = document.getElementById('tgUsername').value.trim();
       const duration = document.getElementById('duration').value;
       if (court)    p.set('court', court);
@@ -545,7 +543,7 @@
       if (!currentSlug()) { setStatus('Select a club first.', 'error'); return; }
       setStatus('Checking…');
       try {
-        const res = await fetch('/api/check?' + params());
+        const res = await fetch('/api/check?' + checkParams());
         if (!res.ok) throw new Error(await res.text());
         const slots = await res.json();
         renderSlots(slots);
@@ -589,23 +587,45 @@
 
     function checkOnce() { fetchSlots(); }
 
-    function togglePoll() {
+    async function togglePoll() {
       const btn = document.getElementById('btnPoll');
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        btn.textContent = 'Start polling';
-        btn.classList.remove('active');
+      if (btn.classList.contains('active')) {
+        await fetch('/api/poll/stop', { method: 'POST' });
+        setPollUI(false);
         setStatus('Polling stopped.');
       } else {
+        if (!currentSlug()) { setStatus('Select a club first.', 'error'); return; }
         Notification.requestPermission();
-        const minutes = parseInt(document.getElementById('interval').value);
-        fetchSlots();
-        pollTimer = setInterval(fetchSlots, minutes * 60 * 1000);
-        btn.textContent = 'Stop polling';
-        btn.classList.add('active');
+        const p = checkParams();
+        p.set('intervalMinutes', document.getElementById('interval').value);
+        await fetch('/api/poll/start?' + p, { method: 'POST' });
+        setPollUI(true);
       }
     }
+
+    function setPollUI(running) {
+      const btn = document.getElementById('btnPoll');
+      btn.textContent = running ? 'Stop polling' : 'Start polling';
+      btn.classList.toggle('active', running);
+    }
+
+    // Sync poll button with server state (handles page refresh / multiple tabs)
+    async function syncPollStatus() {
+      try {
+        const res = await fetch('/api/poll/status');
+        const s = await res.json();
+        setPollUI(s.running);
+        if (s.running && s.lastCheck) {
+          const resultText = s.lastResult === 'no slots' ? 'no slots available'
+              : s.lastResult || '';
+          setStatus(`Last poll: ${s.lastCheck} — ${resultText}`,
+              s.lastResult && s.lastResult.includes('found') ? 'ok' : '');
+        }
+      } catch (_) {}
+    }
+
+    setInterval(syncPollStatus, 4000);
+    syncPollStatus();
 
     // ── Logs ─────────────────────────────────────────────────────────
     let lastLogCount = 0;

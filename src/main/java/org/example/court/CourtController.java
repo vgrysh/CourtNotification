@@ -5,9 +5,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/api")
@@ -17,17 +17,17 @@ public class CourtController {
     private final ClubService clubService;
     private final TelegramService telegramService;
     private final LogService logService;
+    private final PollingService pollingService;
     private final ConfigurableApplicationContext appContext;
-
-    private final ConcurrentHashMap<String, Long> linkedUsers = new ConcurrentHashMap<>();
 
     public CourtController(CourtService courtService, ClubService clubService,
                            TelegramService telegramService, LogService logService,
-                           ConfigurableApplicationContext appContext) {
+                           PollingService pollingService, ConfigurableApplicationContext appContext) {
         this.courtService = courtService;
         this.clubService = clubService;
         this.telegramService = telegramService;
         this.logService = logService;
+        this.pollingService = pollingService;
         this.appContext = appContext;
     }
 
@@ -56,12 +56,11 @@ public class CourtController {
             }
 
             if (telegramUser != null && !telegramUser.isBlank() && !slots.isEmpty()) {
-                String key = normalize(telegramUser);
-                Long chatId = linkedUsers.get(key);
+                Long chatId = telegramService.getChatId(telegramUser);
                 if (chatId != null) {
                     telegramService.notifySlots(chatId, club, date, slots);
                 } else {
-                    logService.log("Telegram user @" + key + " not linked — skipping notification");
+                    logService.log("Telegram user @" + normalize(telegramUser) + " not linked — skipping notification");
                 }
             }
 
@@ -71,6 +70,78 @@ public class CourtController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    /**
+     * Called by Google Cloud Scheduler on a cron schedule.
+     * Checks availability and sends a Telegram notification if slots are found.
+     * Uses TELEGRAM_CHAT_ID env var as the notification target.
+     */
+    @PostMapping("/check-and-notify")
+    public ResponseEntity<?> checkAndNotify(
+            @RequestParam String club,
+            @RequestParam String date,
+            @RequestParam(required = false) String court,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer duration) {
+        try {
+            List<AvailableSlot> slots = courtService.checkAvailability(club, date, court, from, to, duration);
+            logService.log("check-and-notify: " + slots.size() + " slot(s) at " + club + " on " + date);
+
+            if (!slots.isEmpty()) {
+                Long chatId = telegramService.getConfiguredChatId();
+                if (chatId != null) {
+                    telegramService.notifySlots(chatId, club, date, slots);
+                } else {
+                    logService.log("check-and-notify: TELEGRAM_CHAT_ID not set — skipping notification");
+                }
+            }
+            return ResponseEntity.ok(Map.of("slots", slots.size()));
+        } catch (Exception e) {
+            logService.log("ERROR in check-and-notify: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ── Polling ──────────────────────────────────────────────────────────────
+
+    @PostMapping("/poll/start")
+    public ResponseEntity<?> pollStart(
+            @RequestParam String club,
+            @RequestParam String date,
+            @RequestParam(required = false) String court,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer duration,
+            @RequestParam(required = false) String telegramUser,
+            @RequestParam(defaultValue = "5") int intervalMinutes) {
+        PollingConfig cfg = new PollingConfig(club, date, court, from, to, duration, telegramUser, intervalMinutes);
+        pollingService.start(cfg);
+        return ResponseEntity.ok(Map.of("started", true));
+    }
+
+    @PostMapping("/poll/stop")
+    public ResponseEntity<?> pollStop() {
+        pollingService.stop();
+        return ResponseEntity.ok(Map.of("stopped", true));
+    }
+
+    @GetMapping("/poll/status")
+    public ResponseEntity<?> pollStatus() {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("running", pollingService.isRunning());
+        status.put("lastCheck", pollingService.getLastCheckTime());
+        status.put("lastResult", pollingService.getLastCheckResult());
+        PollingConfig cfg = pollingService.getConfig();
+        if (cfg != null) {
+            status.put("intervalMinutes", cfg.intervalMinutes());
+            status.put("club", cfg.club());
+            status.put("date", cfg.date());
+        }
+        return ResponseEntity.ok(status);
+    }
+
+    // ── Telegram ──────────────────────────────────────────────────────────────
 
     @PostMapping("/telegram/configure")
     public ResponseEntity<?> configure(@RequestParam String token) {
@@ -93,7 +164,7 @@ public class CourtController {
                     "error", "No message found from @" + normalize(username) + ". Please send /start to the bot first."
                 ));
             }
-            linkedUsers.put(normalize(username), chatId);
+            telegramService.linkUser(username, chatId);
             telegramService.sendMessage(chatId, "✅ Linked! You'll receive court availability notifications here.");
             logService.log("Linked @" + normalize(username) + " → chat ID " + chatId);
             return ResponseEntity.ok(Map.of("chatId", chatId));
@@ -105,9 +176,10 @@ public class CourtController {
 
     @GetMapping("/telegram/status")
     public ResponseEntity<?> status(@RequestParam String username) {
-        Long chatId = linkedUsers.get(normalize(username));
-        return ResponseEntity.ok(Map.of("linked", chatId != null));
+        return ResponseEntity.ok(Map.of("linked", telegramService.isLinked(username)));
     }
+
+    // ── Logs & shutdown ───────────────────────────────────────────────────────
 
     @GetMapping(value = "/logs", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> logs() {

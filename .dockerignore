@@ -1,0 +1,7 @@
+target/
+*.iml
+.git/
+.idea/
+*.app
+.claude/
+README.md
