@@ -18,7 +18,7 @@ public class CourtNotificationApp {
     @Bean
     public TaskScheduler taskScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(1);
+        scheduler.setPoolSize(8);
         scheduler.setThreadNamePrefix("court-poller-");
         scheduler.setDaemon(true);
         scheduler.initialize();

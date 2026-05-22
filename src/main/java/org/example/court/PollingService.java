@@ -7,7 +7,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
 @Service
@@ -20,10 +23,7 @@ public class PollingService {
     private final LogService logService;
     private final TaskScheduler taskScheduler;
 
-    private volatile ScheduledFuture<?> task;
-    private volatile PollingConfig config;
-    private volatile String lastCheckTime;
-    private volatile String lastCheckResult;
+    private final ConcurrentHashMap<String, PollingTask> tasks = new ConcurrentHashMap<>();
 
     public PollingService(CourtService courtService, TelegramService telegramService,
                           LogService logService, TaskScheduler taskScheduler) {
@@ -33,51 +33,65 @@ public class PollingService {
         this.taskScheduler = taskScheduler;
     }
 
-    public synchronized void start(PollingConfig cfg) {
-        stopInternal(false);
-        this.config = cfg;
-        this.lastCheckTime = null;
-        this.lastCheckResult = null;
+    /** Starts a new polling task and returns its ID. */
+    public String start(PollingConfig cfg) {
+        String id = UUID.randomUUID().toString().substring(0, 8);
         Duration period = Duration.ofMinutes(cfg.intervalMinutes());
-        task = taskScheduler.scheduleAtFixedRate(this::poll, Instant.now(), period);
-        logService.log("Server polling started: " + cfg.club() + " every " + cfg.intervalMinutes() + " min");
+        ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
+                () -> poll(id), Instant.now(), period);
+        tasks.put(id, new PollingTask(id, cfg, future));
+        logService.log("Poll [" + id + "] started: " + cfg.club() + " every " + cfg.intervalMinutes() + " min");
+        return id;
     }
 
-    public synchronized void stop() {
-        stopInternal(true);
-    }
-
-    private void stopInternal(boolean log) {
+    /** Stops the task with the given ID. Returns false if not found. */
+    public boolean stop(String id) {
+        PollingTask task = tasks.remove(id);
         if (task != null) {
-            task.cancel(false);
-            task = null;
-            if (log) logService.log("Server polling stopped");
+            task.getFuture().cancel(false);
+            logService.log("Poll [" + id + "] stopped");
+            return true;
         }
+        return false;
     }
 
-    public boolean isRunning() {
-        return task != null && !task.isDone();
+    /** Stops all running tasks. */
+    public int stopAll() {
+        int count = tasks.size();
+        tasks.forEach((id, task) -> {
+            task.getFuture().cancel(false);
+            logService.log("Poll [" + id + "] stopped");
+        });
+        tasks.clear();
+        return count;
     }
 
-    public PollingConfig getConfig() { return config; }
-    public String getLastCheckTime() { return lastCheckTime; }
-    public String getLastCheckResult() { return lastCheckResult; }
+    public Collection<PollingTask> getAll() {
+        return tasks.values();
+    }
 
-    private void poll() {
-        if (config == null) return;
+    public boolean hasRunning() {
+        return !tasks.isEmpty();
+    }
+
+    private void poll(String id) {
+        PollingTask task = tasks.get(id);
+        if (task == null) return;
+        PollingConfig config = task.getConfig();
         try {
             List<AvailableSlot> slots = courtService.checkAvailability(
                     config.club(), config.date(), config.court(),
                     config.from(), config.to(), config.duration());
 
-            lastCheckTime = LocalTime.now().format(TIME_FMT);
+            String now = LocalTime.now().format(TIME_FMT);
+            task.setLastCheckTime(now);
 
             if (slots.isEmpty()) {
-                lastCheckResult = "no slots";
-                logService.log("Poll: no slots at " + config.club() + " on " + config.date());
+                task.setLastCheckResult("no slots");
+                logService.log("Poll [" + id + "]: no slots at " + config.club() + " on " + config.date());
             } else {
-                lastCheckResult = slots.size() + " slot(s) found";
-                logService.log("Poll: " + slots.size() + " slot(s) found at " + config.club() + " on " + config.date());
+                task.setLastCheckResult(slots.size() + " slot(s) found");
+                logService.log("Poll [" + id + "]: " + slots.size() + " slot(s) at " + config.club() + " on " + config.date());
 
                 String user = config.telegramUser();
                 if (user != null && !user.isBlank()) {
@@ -85,14 +99,14 @@ public class PollingService {
                     if (chatId != null) {
                         telegramService.notifySlots(chatId, config.club(), config.date(), slots);
                     } else {
-                        logService.log("Poll: Telegram user @" + user + " not linked — skipping notification");
+                        logService.log("Poll [" + id + "]: Telegram user @" + user + " not linked — skipping");
                     }
                 }
             }
         } catch (Exception e) {
-            lastCheckTime = LocalTime.now().format(TIME_FMT);
-            lastCheckResult = "error";
-            logService.log("Poll error: " + e.getMessage());
+            task.setLastCheckTime(LocalTime.now().format(TIME_FMT));
+            task.setLastCheckResult("error");
+            logService.log("Poll [" + id + "] error: " + e.getMessage());
         }
     }
 }

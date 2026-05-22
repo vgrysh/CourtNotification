@@ -116,29 +116,38 @@ public class CourtController {
             @RequestParam(required = false) String telegramUser,
             @RequestParam(defaultValue = "5") int intervalMinutes) {
         PollingConfig cfg = new PollingConfig(club, date, court, from, to, duration, telegramUser, intervalMinutes);
-        pollingService.start(cfg);
-        return ResponseEntity.ok(Map.of("started", true));
+        String id = pollingService.start(cfg);
+        return ResponseEntity.ok(Map.of("id", id, "started", true));
     }
 
     @PostMapping("/poll/stop")
-    public ResponseEntity<?> pollStop() {
-        pollingService.stop();
-        return ResponseEntity.ok(Map.of("stopped", true));
+    public ResponseEntity<?> pollStop(@RequestParam(required = false) String id) {
+        if (id != null && !id.isBlank()) {
+            boolean stopped = pollingService.stop(id);
+            return ResponseEntity.ok(Map.of("stopped", stopped));
+        }
+        int count = pollingService.stopAll();
+        return ResponseEntity.ok(Map.of("stopped", count));
     }
 
     @GetMapping("/poll/status")
     public ResponseEntity<?> pollStatus() {
-        Map<String, Object> status = new LinkedHashMap<>();
-        status.put("running", pollingService.isRunning());
-        status.put("lastCheck", pollingService.getLastCheckTime());
-        status.put("lastResult", pollingService.getLastCheckResult());
-        PollingConfig cfg = pollingService.getConfig();
-        if (cfg != null) {
-            status.put("intervalMinutes", cfg.intervalMinutes());
-            status.put("club", cfg.club());
-            status.put("date", cfg.date());
-        }
-        return ResponseEntity.ok(status);
+        List<Map<String, Object>> result = pollingService.getAll().stream().map(t -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", t.getId());
+            m.put("running", t.isRunning());
+            m.put("lastCheck", t.getLastCheckTime());
+            m.put("lastResult", t.getLastCheckResult());
+            PollingConfig cfg = t.getConfig();
+            m.put("club", cfg.club());
+            m.put("date", cfg.date());
+            m.put("from", cfg.from());
+            m.put("to", cfg.to());
+            m.put("court", cfg.court());
+            m.put("intervalMinutes", cfg.intervalMinutes());
+            return m;
+        }).toList();
+        return ResponseEntity.ok(result);
     }
 
     // ── Telegram ──────────────────────────────────────────────────────────────

@@ -127,8 +127,7 @@
     #btnCheck:hover:not(:disabled) { background: #3a58e0; }
 
     #btnPoll { background: #1e2d3d; color: #4fc3f7; border: 1px solid #4fc3f7; }
-    #btnPoll.active { background: #4fc3f7; color: #0f1117; }
-    #btnPoll:hover:not(:disabled):not(.active) { background: #263a4d; }
+    #btnPoll:hover:not(:disabled) { background: #263a4d; }
 
     #status {
       text-align: center;
@@ -312,6 +311,70 @@
     }
 
     .btn-stop-server:hover { background: #3d1e1e; border-color: #f87171; }
+
+    /* Active polls list */
+    #pollsSection { max-width: 680px; margin: 0 auto 20px; }
+
+    .polls-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .poll-card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-left: 3px solid #4fc3f7;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .poll-info { flex: 1; min-width: 0; }
+
+    .poll-club {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .poll-meta {
+      font-size: 0.78rem;
+      color: #7c85a2;
+      margin-top: 2px;
+    }
+
+    .poll-status {
+      font-size: 0.78rem;
+      margin-top: 4px;
+      color: #4a5068;
+    }
+
+    .poll-status.found { color: #4ade80; }
+    .poll-status.error { color: #f87171; }
+
+    .btn-stop-poll {
+      background: none;
+      border: 1px solid #4a3030;
+      color: #f87171;
+      border-radius: 7px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn-stop-poll:hover { background: #3d1e1e; border-color: #f87171; }
   </style>
 </head>
 <body>
@@ -366,13 +429,23 @@
     </div>
     <div class="row-actions">
       <button id="btnCheck" onclick="checkOnce()">Check now</button>
-      <button id="btnPoll" onclick="togglePoll()">Start polling</button>
+      <button id="btnPoll" onclick="addPoll()">Add poll</button>
     </div>
     <div id="status"></div>
   </div>
 
   <!-- Results -->
   <div id="results"></div>
+
+  <!-- Active polls -->
+  <div id="pollsSection" style="display:none">
+    <div class="polls-header">
+      <div class="section-title" style="margin-bottom:0">Active polls</div>
+      <span class="badge" id="pollCount">0</span>
+      <button class="btn-clear" onclick="stopAllPolls()" style="margin-left:auto">Stop all</button>
+    </div>
+    <div id="pollsList"></div>
+  </div>
 
   <!-- Telegram -->
   <div class="card">
@@ -587,40 +660,80 @@
 
     function checkOnce() { fetchSlots(); }
 
-    async function togglePoll() {
-      const btn = document.getElementById('btnPoll');
-      if (btn.classList.contains('active')) {
-        await fetch('/api/poll/stop', { method: 'POST' });
-        setPollUI(false);
-        setStatus('Polling stopped.');
-      } else {
-        if (!currentSlug()) { setStatus('Select a club first.', 'error'); return; }
-        Notification.requestPermission();
-        const p = checkParams();
-        p.set('intervalMinutes', document.getElementById('interval').value);
-        await fetch('/api/poll/start?' + p, { method: 'POST' });
-        setPollUI(true);
+    // Add a new parallel poll task
+    async function addPoll() {
+      if (!currentSlug()) { setStatus('Select a club first.', 'error'); return; }
+      Notification.requestPermission();
+      const p = checkParams();
+      p.set('intervalMinutes', document.getElementById('interval').value);
+      const res = await fetch('/api/poll/start?' + p, { method: 'POST' });
+      const data = await res.json();
+      setStatus(`Poll ${data.id} started.`, 'ok');
+      syncPollStatus();
+    }
+
+    // Stop a specific poll by ID
+    async function stopPoll(id) {
+      await fetch('/api/poll/stop?id=' + id, { method: 'POST' });
+      syncPollStatus();
+    }
+
+    // Stop all polls
+    async function stopAllPolls() {
+      await fetch('/api/poll/stop', { method: 'POST' });
+      syncPollStatus();
+    }
+
+    // Render the active polls list from server state
+    function renderPolls(tasks) {
+      const section = document.getElementById('pollsSection');
+      const list    = document.getElementById('pollsList');
+      const badge   = document.getElementById('pollCount');
+
+      if (tasks.length === 0) {
+        section.style.display = 'none';
+        return;
       }
+
+      section.style.display = 'block';
+      badge.textContent = tasks.length;
+
+      list.innerHTML = tasks.map(t => {
+        const meta = [t.date, t.from && t.to ? `${t.from}–${t.to}` : '', `every ${t.intervalMinutes}min`]
+          .filter(Boolean).join(' · ');
+
+        let statusText = '';
+        let statusClass = '';
+        if (t.lastCheck) {
+          statusText = t.lastResult === 'no slots'
+            ? `${t.lastCheck} — no slots`
+            : t.lastResult
+              ? `${t.lastCheck} — ${t.lastResult}`
+              : t.lastCheck;
+          statusClass = t.lastResult && t.lastResult.includes('found') ? 'found'
+                      : t.lastResult === 'error' ? 'error' : '';
+        } else {
+          statusText = 'Waiting for first check…';
+        }
+
+        return `
+          <div class="poll-card">
+            <div class="poll-info">
+              <div class="poll-club">${escHtml(t.club)} <span style="color:#4a5068;font-size:0.78rem;font-weight:400">#${t.id}</span></div>
+              <div class="poll-meta">${escHtml(meta)}</div>
+              <div class="poll-status ${statusClass}">${escHtml(statusText)}</div>
+            </div>
+            <button class="btn-stop-poll" onclick="stopPoll('${t.id}')">Stop</button>
+          </div>`;
+      }).join('');
     }
 
-    function setPollUI(running) {
-      const btn = document.getElementById('btnPoll');
-      btn.textContent = running ? 'Stop polling' : 'Start polling';
-      btn.classList.toggle('active', running);
-    }
-
-    // Sync poll button with server state (handles page refresh / multiple tabs)
+    // Sync polls panel with server state (handles page refresh / multiple tabs)
     async function syncPollStatus() {
       try {
         const res = await fetch('/api/poll/status');
-        const s = await res.json();
-        setPollUI(s.running);
-        if (s.running && s.lastCheck) {
-          const resultText = s.lastResult === 'no slots' ? 'no slots available'
-              : s.lastResult || '';
-          setStatus(`Last poll: ${s.lastCheck} — ${resultText}`,
-              s.lastResult && s.lastResult.includes('found') ? 'ok' : '');
-        }
+        const tasks = await res.json();
+        renderPolls(tasks);
       } catch (_) {}
     }
 
